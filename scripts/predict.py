@@ -6,8 +6,9 @@ model = load_model("../results/model/final_emotion_model.keras")
 
 df = pd.read_csv("../data/test.csv")
 X, y = [], []
+print(df.columns)
 for _, row in df.iterrows():
-    pixels = np.array(row["pixels "].split(), dtype="float32").reshape(48, 48)
+    pixels = np.array(row[" pixels"].split(), dtype="float32").reshape(48, 48)
     X.append(pixels)
     if "emotion" in df.columns:
         y.append(row["emotion"])
