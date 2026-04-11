@@ -8,7 +8,7 @@ df = pd.read_csv("../data/train.csv")
 
 X, y = [], []
 for _, row in df.iterrows():
-    pixels = np.array(row["pixels"].split(), dtype="float32").reshape(48, 48)
+    pixels = np.array(row["pixels"].split(), dtype="uint8").reshape(48, 48)
     X.append(pixels)
     y.append(row["emotion"])
 
