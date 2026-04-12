@@ -1,60 +1,112 @@
-from tensorflow.keras import layers, models, callbacks
+from tensorflow.keras import layers, models, callbacks, Sequential, regularizers
 import tensorflow as tf
 import pandas as pd
 import numpy as np
 import pickle
 
-# Load data
+# Load data (FAST)
 df = pd.read_csv("../data/train.csv")
 
-X, y = [], []
-for _, row in df.iterrows():
-    pixels = np.array(row["pixels"].split(), dtype="uint8").reshape(48, 48)
-    X.append(pixels)
-    y.append(row["emotion"])
+pixels = df["pixels"].str.split().tolist()
+X = np.array(pixels, dtype="uint8").reshape(-1, 48, 48)
+y = df["emotion"].values
 
-X = np.array(X) / 255.0
+# Normalize
+X = X / 255.0
 X = np.expand_dims(X, -1)
 y = tf.keras.utils.to_categorical(y, 7)
 
-# Model
+# Data augmentation
+data_augmentation = Sequential([
+    layers.RandomFlip("horizontal"),
+    layers.RandomRotation(0.1),
+    layers.RandomZoom(0.1),
+])
+
+# VGG-style model
 model = models.Sequential([
-    layers.Conv2D(32, (3,3), activation='relu', input_shape=(48,48,1)),
-    layers.BatchNormalization(),
-    layers.MaxPooling2D(),
+    layers.Input(shape=(48, 48, 1)),
+    data_augmentation,
 
-    layers.Conv2D(64, (3,3), activation='relu'),
+    # Block 1
+    layers.Conv2D(64, (3,3), padding='same'),
     layers.BatchNormalization(),
-    layers.MaxPooling2D(),
-
-    layers.Conv2D(128, (3,3), activation='relu'),
+    layers.Activation('relu'),
+    layers.Conv2D(64, (3,3), padding='same'),
     layers.BatchNormalization(),
-    layers.MaxPooling2D(),
+    layers.Activation('relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Dropout(0.25),
 
-    layers.Conv2D(256, (3,3), activation='relu'),
+    # Block 2
+    layers.Conv2D(128, (3,3), padding='same'),
     layers.BatchNormalization(),
-    layers.MaxPooling2D(),
+    layers.Activation('relu'),
+    layers.Conv2D(128, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Dropout(0.25),
 
+    # Block 3
+    layers.Conv2D(256, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.Conv2D(256, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.Conv2D(256, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Dropout(0.25),
+
+    # Block 4
+    layers.Conv2D(512, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.Conv2D(512, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.Conv2D(512, (3,3), padding='same'),
+    layers.BatchNormalization(),
+    layers.Activation('relu'),
+    layers.MaxPooling2D((2,2)),
+    layers.Dropout(0.25),
+
+    # Classifier
     layers.Flatten(),
-    layers.Dense(256, activation='relu'),
+    layers.Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.001)),
+    layers.Dropout(0.5),
+    layers.Dense(512, activation='relu', kernel_regularizer=regularizers.l2(0.001)),
     layers.Dropout(0.5),
     layers.Dense(7, activation='softmax')
 ])
 
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(learning_rate=0.0003),
+    loss='categorical_crossentropy',
+    metrics=['accuracy']
+)
 
-# Callbacks
 cb = [
     callbacks.EarlyStopping(patience=5, restore_best_weights=True),
-    callbacks.TensorBoard(log_dir="../results/logs")
+    callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=1e-5)
 ]
 
 # Train
-history = model.fit(X, y, epochs=30, batch_size=64, validation_split=0.2, callbacks=cb)
+history = model.fit(
+    X, y,
+    epochs=30,
+    batch_size=64,
+    validation_split=0.2,
+    callbacks=cb
+)
 
 # Save
 model.save("../results/model/final_emotion_model.keras")
 
 with open("../results/model/history.pkl", "wb") as f:
     pickle.dump(history.history, f)
+
 model.summary()
