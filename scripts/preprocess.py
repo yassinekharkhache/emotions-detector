@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import os
 
-# Load Haarcascade (FIXED PATH)
+# load Haar Cascade for face detection
 haar_path = os.path.join(
     os.path.dirname(cv2.__file__),
     "data",
