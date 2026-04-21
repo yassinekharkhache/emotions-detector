@@ -2,28 +2,25 @@ from tensorflow.keras import layers, models, callbacks, Sequential, regularizers
 import tensorflow as tf
 import pandas as pd
 import numpy as np
-import pickle
 
-# Load data (FAST)
+from validation_loss_accuracy import plot_learning_curves
+
 df = pd.read_csv("../data/train.csv")
 
 pixels = df["pixels"].str.split().tolist()
 X = np.array(pixels, dtype="uint8").reshape(-1, 48, 48)
 y = df["emotion"].values
 
-# Normalize
 X = X / 255.0
 X = np.expand_dims(X, -1)
 y = tf.keras.utils.to_categorical(y, 7)
 
-# Data augmentation
 data_augmentation = Sequential([
     layers.RandomFlip("horizontal"),
     layers.RandomRotation(0.1),
     layers.RandomZoom(0.1),
 ])
 
-# VGG-style model
 model = models.Sequential([
     layers.Input(shape=(48, 48, 1)),
     data_augmentation,
@@ -83,15 +80,25 @@ model = models.Sequential([
     layers.Dense(7, activation='softmax')
 ])
 
+# append model summary to file
+with open("../results/final_emotion_model_arch.txt", "w") as f:
+    model.summary(print_fn=lambda x: f.write(x + '\n'))
+
 model.compile(
     optimizer=tf.keras.optimizers.Adam(learning_rate=0.0003),
     loss='categorical_crossentropy',
     metrics=['accuracy']
 )
 
+
 cb = [
-    callbacks.EarlyStopping(patience=5, restore_best_weights=True),
-    callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=1e-5)
+    callbacks.EarlyStopping(
+        monitor='val_loss', patience=5, restore_best_weights=True, verbose=1
+    ),
+    callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=0.2, patience=3, min_lr=1e-5, verbose=1
+    ),
+    callbacks.TensorBoard(log_dir="../results/logs", histogram_freq=1),
 ]
 
 # Train
@@ -103,10 +110,4 @@ history = model.fit(
     callbacks=cb
 )
 
-# Save
-model.save("../results/model/final_emotion_model.keras")
-
-with open("../results/model/history.pkl", "wb") as f:
-    pickle.dump(history.history, f)
-
-model.summary()
+plot_learning_curves(history.history)
