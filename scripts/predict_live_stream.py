@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
 from tensorflow.keras.models import load_model
-from preprocess import extract_faces
 import time
+
+from preprocess import extract_faces
 
 model = load_model("../results/model/final_emotion_model.keras")
 
@@ -37,7 +38,7 @@ while True:
         print(f"{time.strftime('%H:%M:%S')} : {emotion} , {int(conf*100)}%")
     
     cv2.imshow("Camera", frame)
-    if cv2.waitKey(1000) & 0xFF == 27:
+    if cv2.waitKey(10) & 0xFF == 27:
         break
 
 cap.release()

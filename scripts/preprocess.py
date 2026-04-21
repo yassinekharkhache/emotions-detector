@@ -1,5 +1,4 @@
 from tensorflow.keras.models import load_model
-from preprocess import extract_faces
 from uuid import uuid4 as UUID
 import numpy as np
 import cv2
@@ -32,11 +31,17 @@ model = load_model("../results/model/final_emotion_model.keras")
 
 labels = ["Angry","Disgust","Fear","Happy","Sad","Surprise","Neutral"]
 
-OUTPUT_DIR = "./preproced"
+OUTPUT_DIR = "../results/preprocessing_test"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def red_vedio(vedio_path):
-    cap = cv2.VideoCapture(vedio_path)
+def read_video(video_path):
+    i = 0
+    cap = cv2.VideoCapture(video_path)
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_interval = int(fps)
+
+    frame_count = 0
 
     print("Reading video stream ...")
 
@@ -45,19 +50,25 @@ def red_vedio(vedio_path):
         if not ret:
             break
 
-        faces = extract_faces(frame)
+        if frame_count % frame_interval == 0:
 
-        for (face, (x, y, w, h)) in faces:
-            face = face / 255.0
-            face = np.expand_dims(face, axis=(0,-1))
+            faces = extract_faces(frame)
 
-            pred = model.predict(face, verbose=0)
-            emotion = labels[np.argmax(pred)]
-            conf = np.max(pred)
-            
-            # save face
-            filename = f"{emotion}_{int(conf*100)}_{UUID().hex[:8]}.png"
-            cv2.imwrite(os.path.join(OUTPUT_DIR, filename), face[0,:,:,0]*255)
-        
+            for (face, (x, y, w, h)) in faces:
+                face = face / 255.0
+                face = np.expand_dims(face, axis=(0, -1))
+
+                pred = model.predict(face, verbose=0)
+                emotion = labels[np.argmax(pred)]
+                conf = np.max(pred)
+
+                filename = f"{"Image"}_{i}.png"
+                i+=1;
+                cv2.imwrite(os.path.join(OUTPUT_DIR, filename), face[0, :, :, 0] * 255)
+
+        frame_count += 1
+
     cap.release()
     cv2.destroyAllWindows()
+
+read_video("../results/preprocessing_test/input.mp4")
